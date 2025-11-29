@@ -10,6 +10,8 @@ require("awful.autofocus")
 local wibox = require("wibox")
 -- Theme handling library
 local beautiful = require("beautiful")
+-- Timer library
+local timer = require("gears.timer")
 -- Notification library
 local naughty = require("naughty")
 local menubar = require("menubar")
@@ -186,23 +188,22 @@ local memwidget = wibox.widget.textbox()
 if has_vicious then
     vicious.register(memwidget, vicious.widgets.mem,
         function(widget, args)
+            -- Debug: Print what we're getting
             -- vicious.widgets.mem provides: {used, total, free, shared, buffer, cache, available}
             if not args or type(args) ~= "table" then
                 return " MERR "
             end
             
-            -- Try different ways vicious might return data
-            local used, total
-            if args.used and args.total then
-                -- If args is named fields
-                used = args.used
-                total = args.total
-            elseif #args >= 2 then
-                -- If args is indexed array
-                used = args[1]
-                total = args[2]
-            else
-                return " MBAD "
+            -- Check all possible index positions for used/total
+            local used = args[1] or args[2] or args.used or 0
+            local total = args[2] or args[1] or args.total or 0
+            
+            -- Also try named keys if indexed don't work
+            if total == 0 then
+                total = args.total or 1
+            end
+            if used == 0 then
+                used = args.used or 0
             end
             
             if not used or not total or total == 0 then
@@ -210,8 +211,6 @@ if has_vicious then
             end
             
             local percent = math.floor((used / total) * 100)
-            local used_gb = math.floor(used / 1024 / 1024)
-            local total_gb = math.floor(total / 1024 / 1024)
             return string.format(" M%d%% ", percent)
         end, 5)  -- Update every 5 seconds
 else
