@@ -186,15 +186,16 @@ local memwidget = wibox.widget.textbox()
 if has_vicious then
     vicious.register(memwidget, vicious.widgets.mem,
         function(widget, args)
-            local used = args[2] or 0
-            local total = args[1] or 1
+            -- vicious.widgets.mem provides: {used, total, free, shared, buffer, cache, available}
+            local used = args[1] or 0
+            local total = args[2] or 1
             local percent = math.floor((used / total) * 100)
             local used_gb = math.floor(used / 1024 / 1024)
             local total_gb = math.floor(total / 1024 / 1024)
-            return string.format(" RAM: %d%% (%dGB/%dGB) ", percent, used_gb, total_gb)
+            return string.format(" MEM:%d%% (%dGB/%dGB) ", percent, used_gb, total_gb)
         end, 5)  -- Update every 5 seconds
 else
-    memwidget:set_text(" RAM: N/A ")
+    memwidget:set_text(" MEM: N/A ")
 end
 
 -- Create GPU widget
@@ -303,9 +304,9 @@ else
     netwidget:set_text(" Net: N/A ")
 end
 
--- Create separator widget
+-- Create separator widget (compact spacing)
 local separator = wibox.widget.textbox()
-separator:set_text(" | ")
+separator:set_text("  ")
 
 -- Create a textclock widget
 mytextclock = wibox.widget.textclock()
