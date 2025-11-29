@@ -181,6 +181,84 @@ else
     cpuwidget:set_text(" CPU: N/A ")
 end
 
+-- Create RAM widget
+local memwidget = wibox.widget.textbox()
+if has_vicious then
+    vicious.register(memwidget, vicious.widgets.mem,
+        function(widget, args)
+            local used = args[2] or 0
+            local total = args[1] or 1
+            local percent = math.floor((used / total) * 100)
+            local used_gb = math.floor(used / 1024 / 1024)
+            local total_gb = math.floor(total / 1024 / 1024)
+            return string.format(" RAM: %d%% (%dGB/%dGB) ", percent, used_gb, total_gb)
+        end, 5)  -- Update every 5 seconds
+else
+    memwidget:set_text(" RAM: N/A ")
+end
+
+-- Create GPU widget
+local gpuwidget = wibox.widget.textbox()
+if has_vicious then
+    -- Function to get GPU info using nvidia-smi or fallback
+    local function get_gpu_info()
+        local handle = io.popen("nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total --format=csv,noheader,nounits 2>/dev/null || echo '0,0,0'")
+        local result = handle:read("*a")
+        handle:close()
+        
+        local gpu_util, mem_used, mem_total = result:match("(%d+), (%d+), (%d+)")
+        gpu_util = tonumber(gpu_util) or 0
+        mem_used = tonumber(mem_used) or 0
+        mem_total = tonumber(mem_total) or 0
+        
+        if gpu_util > 0 then
+            return string.format(" GPU: %d%% (%dMB/%dMB) ", gpu_util, mem_used, mem_total)
+        else
+            -- Fallback for systems without NVIDIA
+            local handle2 = io.popen("cat /sys/class/drm/*/gpu_busy_percent 2>/dev/null | head -1 || echo '0'")
+            local result2 = handle2:read("*a")
+            handle2:close()
+            local util = tonumber(result2:gsub("%s+", "")) or 0
+            return string.format(" GPU: %d%% ", util)
+        end
+    end
+    
+    vicious.register(gpuwidget, 
+        function() return get_gpu_info() end, 
+        3)  -- Update every 3 seconds
+else
+    gpuwidget:set_text(" GPU: N/A ")
+end
+
+-- Create Battery widget
+local batwidget = wibox.widget.textbox()
+if has_vicious then
+    vicious.register(batwidget, vicious.widgets.bat,
+        function(widget, args)
+            local state = args[1] or "N/A"
+            local percent = args[2] or 0
+            local time = args[3] or ""
+            
+            if state == "N/A" or state == "-" then
+                return " BAT: AC "
+            else
+                local icon = "⚡"
+                if state == "↯" then icon = "🔌"
+                elseif state == "+" then icon = "🔋"
+                elseif state == "-" then icon = "🔻"
+                end
+                
+                if time and time ~= "" then
+                    return string.format(" BAT: %s %d%% (%s) ", icon, percent, time)
+                else
+                    return string.format(" BAT: %s %d%% ", icon, percent)
+                end
+            end
+        end, 10)  -- Update every 10 seconds
+else
+    batwidget:set_text(" BAT: N/A ")
+end
+
 -- Create Network widget
 local netwidget = wibox.widget.textbox()
 if has_vicious then
@@ -320,6 +398,12 @@ awful.screen.connect_for_each_screen(function(s)
         { -- Right widgets
             layout = wibox.layout.fixed.horizontal,
             cpuwidget,
+            separator,
+            memwidget,
+            separator,
+            gpuwidget,
+            separator,
+            batwidget,
             separator,
             netwidget,
             separator,
