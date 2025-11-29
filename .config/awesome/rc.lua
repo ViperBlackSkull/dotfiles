@@ -188,30 +188,15 @@ local memwidget = wibox.widget.textbox()
 if has_vicious then
     vicious.register(memwidget, vicious.widgets.mem,
         function(widget, args)
-            -- Debug: Print what we're getting
-            -- vicious.widgets.mem provides: {used, total, free, shared, buffer, cache, available}
-            if not args or type(args) ~= "table" then
+            -- Just use the first two values vicious returns
+            if args and #args >= 2 then
+                local used = args[1] or 0
+                local total = args[2] or 1
+                local percent = math.floor((used / total) * 100)
+                return string.format(" M%d%% ", percent)
+            else
                 return " MERR "
             end
-            
-            -- Check all possible index positions for used/total
-            local used = args[1] or args[2] or args.used or 0
-            local total = args[2] or args[1] or args.total or 0
-            
-            -- Also try named keys if indexed don't work
-            if total == 0 then
-                total = args.total or 1
-            end
-            if used == 0 then
-                used = args.used or 0
-            end
-            
-            if not used or not total or total == 0 then
-                return " M0 "
-            end
-            
-            local percent = math.floor((used / total) * 100)
-            return string.format(" M%d%% ", percent)
         end, 5)  -- Update every 5 seconds
 else
     memwidget:set_text(" M ")
@@ -267,7 +252,7 @@ if has_vicious then
             if ok then
                 return output
             else
-                return " GPU:ERROR "
+                return " GERR "
             end
         end, 
         3)  -- Update every 3 seconds
