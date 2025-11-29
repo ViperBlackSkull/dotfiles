@@ -175,7 +175,7 @@ local cpuwidget = wibox.widget.textbox()
 if has_vicious then
     vicious.register(cpuwidget, vicious.widgets.cpu,
         function(widget, args)
-            return string.format(" %d%% ", args[1] or 0)
+            return string.format(" C%d%% ", args[1] or 0)
         end)
 else
     cpuwidget:set_text(" C ")
@@ -212,7 +212,7 @@ if has_vicious then
             local percent = math.floor((used / total) * 100)
             local used_gb = math.floor(used / 1024 / 1024)
             local total_gb = math.floor(total / 1024 / 1024)
-            return string.format(" %d%% ", percent)
+            return string.format(" M%d%% ", percent)
         end, 5)  -- Update every 5 seconds
 else
     memwidget:set_text(" M ")
@@ -243,7 +243,7 @@ if has_vicious then
         end
         
         if gpu_util > 0 and mem_total > 0 then
-            return string.format(" %d%% ", gpu_util)
+            return string.format(" G%d%% ", gpu_util)
         else
             -- Fallback for systems without NVIDIA or simple GPU info
             local ok2, result2 = pcall(function()
@@ -255,7 +255,7 @@ if has_vicious then
             
             if ok2 then
                 local util = tonumber(result2:gsub("%s+", "")) or 0
-                return string.format(" %d%% ", util)
+                return string.format(" G%d%% ", util)
             else
                 return " G "
             end
@@ -286,7 +286,7 @@ if has_vicious then
             local time = args[3] or ""
             
             if state == "N/A" or state == "-" then
-                return " AC "
+                return " BAC "
             else
                 local icon = ""
                 if state == "↯" then icon = "🔌"
@@ -295,7 +295,7 @@ if has_vicious then
                 else icon = "⚡"
                 end
                 
-                return string.format(" %s%d%% ", icon, percent)
+                return string.format(" B%s%d%% ", icon, percent)
             end
         end, 10)  -- Update every 10 seconds
 else
@@ -340,7 +340,7 @@ if has_vicious then
             last_tx = tx
             
             -- Format with one decimal place
-            return string.format(" %.0f↓ %.0f↑", rx_rate, tx_rate)
+            return string.format(" N%.0f↓%.0f↑", rx_rate, tx_rate)
         end, 1)  -- Update every 1 second
 else
     netwidget:set_text(" N ")
