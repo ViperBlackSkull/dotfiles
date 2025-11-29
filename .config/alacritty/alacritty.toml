@@ -1,0 +1,69 @@
+[colors.bright]
+black = "#709080"
+blue = "#94BFF3"
+cyan = "#93E0E3"
+green = "#C3BF9F"
+magenta = "#EC93D3"
+red = "#DCA3A3"
+white = "#FFFFFF"
+yellow = "#E0CF9F"
+
+[colors.cursor]
+cursor = "#DCDCCC"
+text = "#3F3F3F"
+
+[colors.normal]
+black = "#4D4D4D"
+blue = "#6CA0A3"
+cyan = "#93E0E3"
+green = "#7F9F7F"
+magenta = "#DC8CC3"
+red = "#CC9393"
+white = "#DCDCCC"
+yellow = "#F0DFAF"
+
+[colors.primary]
+background = "#3F3F3F"
+foreground = "#DCDCCC"
+
+[cursor]
+blink_interval = 550
+unfocused_hollow = true
+
+[cursor.style]
+blinking = "On"
+shape = "Block"
+
+[font]
+size = 11.0
+
+[font.bold]
+family = "JetBrains Mono"
+style = "Bold"
+
+[font.italic]
+family = "JetBrains Mono"
+style = "Italic"
+
+[font.normal]
+family = "JetBrains Mono"
+style = "Regular"
+
+[mouse]
+hide_when_typing = true
+
+[selection]
+save_to_clipboard = true
+
+[terminal.shell]
+program = "/bin/bash"
+
+[window]
+decorations = "none"
+opacity = 0.95
+
+[window.padding]
+x = 8
+y = 8
+
+[terminal]

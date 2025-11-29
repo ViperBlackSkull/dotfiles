@@ -19,5 +19,15 @@ echo "Installing Awesome config..."
 mkdir -p "$HOME/.config"
 cp -r "$(dirname "$0")/.config/awesome" "$HOME/.config/"
 
+# Install Alacritty config
+if [ -d "$HOME/.config/alacritty" ]; then
+    echo "Backing up existing Alacritty config..."
+    mv "$HOME/.config/alacritty" "$backup_dir/alacritty"
+fi
+
+echo "Installing Alacritty config..."
+mkdir -p "$HOME/.config"
+cp -r "$(dirname "$0")/.config/alacritty" "$HOME/.config/"
+
 echo "Dotfiles installed successfully!"
 echo "Your old configs are backed up in: $backup_dir"
