@@ -175,10 +175,10 @@ local cpuwidget = wibox.widget.textbox()
 if has_vicious then
     vicious.register(cpuwidget, vicious.widgets.cpu,
         function(widget, args)
-            return string.format(" CPU: %d%% ", args[1] or 0)
+            return string.format(" %d%% ", args[1] or 0)
         end)
 else
-    cpuwidget:set_text(" CPU: N/A ")
+    cpuwidget:set_text(" C ")
 end
 
 -- Create RAM widget
@@ -187,24 +187,35 @@ if has_vicious then
     vicious.register(memwidget, vicious.widgets.mem,
         function(widget, args)
             -- vicious.widgets.mem provides: {used, total, free, shared, buffer, cache, available}
-            if not args or type(args) ~= "table" or #args < 2 then
-                return " MEM:ERR "
+            if not args or type(args) ~= "table" then
+                return " MERR "
             end
             
-            local used = args[1] or 0
-            local total = args[2] or 1
+            -- Try different ways vicious might return data
+            local used, total
+            if args.used and args.total then
+                -- If args is named fields
+                used = args.used
+                total = args.total
+            elseif #args >= 2 then
+                -- If args is indexed array
+                used = args[1]
+                total = args[2]
+            else
+                return " MBAD "
+            end
             
-            if total <= 0 then
-                return " MEM:ERR "
+            if not used or not total or total == 0 then
+                return " M0 "
             end
             
             local percent = math.floor((used / total) * 100)
             local used_gb = math.floor(used / 1024 / 1024)
             local total_gb = math.floor(total / 1024 / 1024)
-            return string.format(" MEM:%d%% (%dGB/%dGB) ", percent, used_gb, total_gb)
+            return string.format(" %d%% ", percent)
         end, 5)  -- Update every 5 seconds
 else
-    memwidget:set_text(" MEM:N/A ")
+    memwidget:set_text(" M ")
 end
 
 -- Create GPU widget
@@ -220,7 +231,7 @@ if has_vicious then
         end)
         
         if not ok then
-            return " GPU: ERROR "
+            return " GERR "
         end
         
         local gpu_util, mem_used, mem_total = 0, 0, 0
@@ -232,7 +243,7 @@ if has_vicious then
         end
         
         if gpu_util > 0 and mem_total > 0 then
-            return string.format(" GPU:%d%% (%dMB/%dMB) ", gpu_util, mem_used, mem_total)
+            return string.format(" %d%% ", gpu_util)
         else
             -- Fallback for systems without NVIDIA or simple GPU info
             local ok2, result2 = pcall(function()
@@ -244,9 +255,9 @@ if has_vicious then
             
             if ok2 then
                 local util = tonumber(result2:gsub("%s+", "")) or 0
-                return string.format(" GPU:%d%% ", util)
+                return string.format(" %d%% ", util)
             else
-                return " GPU:N/A "
+                return " G "
             end
         end
     end
@@ -262,7 +273,7 @@ if has_vicious then
         end, 
         3)  -- Update every 3 seconds
 else
-    gpuwidget:set_text(" GPU:N/A ")
+    gpuwidget:set_text(" G ")
 end
 
 -- Create Battery widget
@@ -275,23 +286,20 @@ if has_vicious then
             local time = args[3] or ""
             
             if state == "N/A" or state == "-" then
-                return " BAT: AC "
+                return " AC "
             else
-                local icon = "⚡"
+                local icon = ""
                 if state == "↯" then icon = "🔌"
                 elseif state == "+" then icon = "🔋"
                 elseif state == "-" then icon = "🔻"
+                else icon = "⚡"
                 end
                 
-                if time and time ~= "" then
-                    return string.format(" BAT: %s %d%% (%s) ", icon, percent, time)
-                else
-                    return string.format(" BAT: %s %d%% ", icon, percent)
-                end
+                return string.format(" %s%d%% ", icon, percent)
             end
         end, 10)  -- Update every 10 seconds
 else
-    batwidget:set_text(" BAT: N/A ")
+    batwidget:set_text(" B ")
 end
 
 -- Create Network widget
@@ -332,15 +340,15 @@ if has_vicious then
             last_tx = tx
             
             -- Format with one decimal place
-            return string.format(" %s: ↓%.1fKB/s ↑%.1fKB/s ", interface, rx_rate, tx_rate)
+            return string.format(" %.0f↓ %.0f↑", rx_rate, tx_rate)
         end, 1)  -- Update every 1 second
 else
-    netwidget:set_text(" Net: N/A ")
+    netwidget:set_text(" N ")
 end
 
 -- Create separator widget (compact spacing)
 local separator = wibox.widget.textbox()
-separator:set_text("  ")
+separator:set_text(" ")
 
 -- Create a textclock widget
 mytextclock = wibox.widget.textclock()
