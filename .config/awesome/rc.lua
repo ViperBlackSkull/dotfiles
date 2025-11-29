@@ -187,15 +187,24 @@ if has_vicious then
     vicious.register(memwidget, vicious.widgets.mem,
         function(widget, args)
             -- vicious.widgets.mem provides: {used, total, free, shared, buffer, cache, available}
+            if not args or type(args) ~= "table" or #args < 2 then
+                return " MEM:ERR "
+            end
+            
             local used = args[1] or 0
             local total = args[2] or 1
+            
+            if total <= 0 then
+                return " MEM:ERR "
+            end
+            
             local percent = math.floor((used / total) * 100)
             local used_gb = math.floor(used / 1024 / 1024)
             local total_gb = math.floor(total / 1024 / 1024)
             return string.format(" MEM:%d%% (%dGB/%dGB) ", percent, used_gb, total_gb)
         end, 5)  -- Update every 5 seconds
 else
-    memwidget:set_text(" MEM: N/A ")
+    memwidget:set_text(" MEM:N/A ")
 end
 
 -- Create GPU widget
@@ -203,32 +212,57 @@ local gpuwidget = wibox.widget.textbox()
 if has_vicious then
     -- Function to get GPU info using nvidia-smi or fallback
     local function get_gpu_info()
-        local handle = io.popen("nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total --format=csv,noheader,nounits 2>/dev/null || echo '0,0,0'")
-        local result = handle:read("*a")
-        handle:close()
+        local ok, result = pcall(function()
+            local handle = io.popen("nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total --format=csv,noheader,nounits 2>/dev/null || echo '0,0,0'")
+            local output = handle:read("*a")
+            handle:close()
+            return output
+        end)
         
-        local gpu_util, mem_used, mem_total = result:match("(%d+), (%d+), (%d+)")
-        gpu_util = tonumber(gpu_util) or 0
-        mem_used = tonumber(mem_used) or 0
-        mem_total = tonumber(mem_total) or 0
+        if not ok then
+            return " GPU: ERROR "
+        end
         
-        if gpu_util > 0 then
-            return string.format(" GPU: %d%% (%dMB/%dMB) ", gpu_util, mem_used, mem_total)
+        local gpu_util, mem_used, mem_total = 0, 0, 0
+        if result then
+            gpu_util, mem_used, mem_total = result:match("(%d+), (%d+), (%d+)")
+            gpu_util = tonumber(gpu_util) or 0
+            mem_used = tonumber(mem_used) or 0
+            mem_total = tonumber(mem_total) or 0
+        end
+        
+        if gpu_util > 0 and mem_total > 0 then
+            return string.format(" GPU:%d%% (%dMB/%dMB) ", gpu_util, mem_used, mem_total)
         else
-            -- Fallback for systems without NVIDIA
-            local handle2 = io.popen("cat /sys/class/drm/*/gpu_busy_percent 2>/dev/null | head -1 || echo '0'")
-            local result2 = handle2:read("*a")
-            handle2:close()
-            local util = tonumber(result2:gsub("%s+", "")) or 0
-            return string.format(" GPU: %d%% ", util)
+            -- Fallback for systems without NVIDIA or simple GPU info
+            local ok2, result2 = pcall(function()
+                local handle2 = io.popen("cat /sys/class/drm/*/gpu_busy_percent 2>/dev/null | head -1 || echo '0'")
+                local output2 = handle2:read("*a")
+                handle2:close()
+                return output2
+            end)
+            
+            if ok2 then
+                local util = tonumber(result2:gsub("%s+", "")) or 0
+                return string.format(" GPU:%d%% ", util)
+            else
+                return " GPU:N/A "
+            end
         end
     end
     
     vicious.register(gpuwidget, 
-        function() return get_gpu_info() end, 
+        function() 
+            local ok, output = pcall(get_gpu_info)
+            if ok then
+                return output
+            else
+                return " GPU:ERROR "
+            end
+        end, 
         3)  -- Update every 3 seconds
 else
-    gpuwidget:set_text(" GPU: N/A ")
+    gpuwidget:set_text(" GPU:N/A ")
 end
 
 -- Create Battery widget
