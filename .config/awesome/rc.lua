@@ -10,15 +10,19 @@ require("awful.autofocus")
 local wibox = require("wibox")
 -- Theme handling library
 local beautiful = require("beautiful")
--- Timer library
-local timer = require("gears.timer")
 -- Notification library
 local naughty = require("naughty")
 local menubar = require("menubar")
 local hotkeys_popup = require("awful.hotkeys_popup")
+-- Vicious widgets
+local vicious = require("vicious")
+-- Enable hotkeys help widget for VIM and other apps
+-- when client with a matching name is opened:
 require("awful.hotkeys_popup.keys")
 
 -- {{{ Error handling
+-- Check if awesome encountered an error during startup and fell back to
+-- another config (This code will only ever execute for the fallback config)
 if awesome.startup_errors then
     naughty.notify({ preset = naughty.config.presets.critical,
                      title = "Oops, there were errors during startup!",
@@ -42,73 +46,31 @@ end
 -- }}}
 
 -- {{{ Variable definitions
--- Use Zenburn theme with dark mode optimizations
-local theme_path = gears.filesystem.get_themes_dir() .. "zenburn/theme.lua"
-beautiful.init(theme_path)
+-- Themes define colours, icons, font and wallpapers.
+beautiful.init(gears.filesystem.get_themes_dir() .. "zenburn/theme.lua")
+-- Set custom wallpaper
+beautiful.wallpaper = os.getenv("HOME") .. "/.config/awesome/wallpapers/Viper-Wallpaper.jpg"
 
--- Create a function to set dark theme properties after theme initialization
-local function set_dark_theme()
-    local theme = beautiful.get()
-    -- Set modern monospace font
-    local font = "JetBrains Mono"
-    -- Fallback fonts if JetBrains Mono is not available
-    local fallback = "DejaVu Sans Mono, Liberation Mono, Hack, Fira Code, Monospace"
-    local font_size = "11"
-    
-    theme.font = font .. " " .. font_size
-    theme.taglist_font = font .. " " .. font_size
-    theme.tasklist_font = font .. " " .. font_size
-    theme.titlebar_font = font .. " " .. font_size
-    -- Dark mode optimizations
-    theme.bg_normal = "#1E1E1E"
-    theme.bg_focus = "#333333"
-    theme.bg_urgent = "#3F3F3F"
-    theme.bg_minimize = "#262626"
-    theme.bg_systray = theme.bg_normal
+-- Modern visual enhancements - seamless, no bezels
+beautiful.useless_gap = 0
+beautiful.border_width = 0
+beautiful.border_focus = "#00ffcc"
+beautiful.border_normal = "#1a1a2e"
+beautiful.bg_normal = "#0d0d1a"
+beautiful.bg_focus = "#1a1a2e"
+beautiful.fg_normal = "#b0b0b0"
+beautiful.fg_focus = "#00ffcc"
 
-    theme.fg_normal = "#CCCCCC"
-    theme.fg_focus = "#FFFFFF"
-    theme.fg_urgent = "#FF7777"
-    theme.fg_minimize = "#888888"
+-- Hide titlebars for clean look
+beautiful.titlebar_bg_normal = "#0d0d1a"
+beautiful.titlebar_bg_focus = "#1a1a2e"
+beautiful.titlebar_fg_normal = "#606060"
+beautiful.titlebar_fg_focus = "#00ffcc"
 
-    theme.border_width = 2
-    theme.border_normal = "#3F3F3F"
-    theme.border_focus = "#6F6F6F"
-    theme.border_marked = "#CC9393"
-
-    theme.tasklist_bg_focus = "#333333"
-    theme.tasklist_bg_normal = "#1E1E1E"
-    theme.taglist_bg_focus = "#333333"
-    theme.taglist_bg_normal = "#1E1E1E"
-
-    theme.menu_height = 20
-    theme.menu_width = 180
-    theme.menu_bg_normal = "#1E1E1E"
-    theme.menu_bg_focus = "#333333"
-    theme.menu_fg_normal = "#CCCCCC"
-    theme.menu_fg_focus = "#FFFFFF"
-end
-
--- Apply the dark theme settings
-set_dark_theme()
-
--- Set wallpaper function
-local function set_wallpaper(s)
-    -- Get the wallpaper path
-    local wallpaper = os.getenv("HOME") .. "/.config/awesome/wallpapers/Viper-Wallpaper.jpg"
-    
-    -- If the file exists, set it as wallpaper
-    if gears.filesystem.file_readable(wallpaper) then
-        -- Try using fit method instead of maximized
-        gears.wallpaper.fit(wallpaper, s)
-    else
-        naughty.notify({ 
-            preset = naughty.config.presets.critical,
-            title = "Wallpaper Error",
-            text = "Could not find wallpaper at: " .. wallpaper
-        })
-    end
-end
+-- Better fonts
+beautiful.font = "Liberation Mono 10"
+beautiful.taglist_font = "Liberation Mono Bold 10"
+beautiful.tasklist_font = "Liberation Mono 9"
 
 -- This is used later as the default terminal and editor to run.
 terminal = "alacritty"
@@ -117,6 +79,9 @@ editor_cmd = terminal .. " -e " .. editor
 
 -- Default modkey.
 -- Usually, Mod4 is the key with a logo between Control and Alt.
+-- If you do not like this or do not have such a key,
+-- I suggest you to remap Mod4 to another key using xmodmap or other tools.
+-- However, you can use another modifier like Mod1, but it may interact with others.
 modkey = "Mod4"
 
 -- Table of layouts to cover with awful.layout.inc, order matters.
@@ -134,6 +99,9 @@ awful.layout.layouts = {
     awful.layout.suit.max.fullscreen,
     awful.layout.suit.magnifier,
     awful.layout.suit.corner.nw,
+    -- awful.layout.suit.corner.ne,
+    -- awful.layout.suit.corner.sw,
+    -- awful.layout.suit.corner.se,
 }
 -- }}}
 
@@ -159,228 +127,193 @@ mylauncher = awful.widget.launcher({ image = beautiful.awesome_icon,
 menubar.utils.terminal = terminal -- Set the terminal for applications that require it
 -- }}}
 
--- {{{ Wibar
--- Protect against missing vicious library
-local has_vicious, vicious = pcall(require, "vicious")
+-- Keyboard map indicator and switcher
+mykeyboardlayout = awful.widget.keyboardlayout()
 
--- Debug notification for vicious loading
-if not has_vicious then
-    naughty.notify({ 
-        preset = naughty.config.presets.critical,
-        title = "Vicious not loaded",
-        text = tostring(vicious)  -- This will show the error message
-    })
-end
+-- {{{ Steam Deck-style Performance Widgets
 
--- Create CPU widget
-local cpuwidget = wibox.widget.textbox()
-if has_vicious then
-    vicious.register(cpuwidget, vicious.widgets.cpu,
-        function(widget, args)
-            return string.format(" C%d%% ", args[1] or 0)
-        end)
-else
-    cpuwidget:set_text(" C ")
-end
+-- Initialize widgets safely
+local perf_widget_container
 
--- Create RAM widget
-local memwidget = wibox.widget.textbox()
-if has_vicious then
-    vicious.register(memwidget, vicious.widgets.mem,
-        function(widget, args)
-            -- Just use the first two values vicious returns
-            if args and #args >= 2 then
-                local used = args[1] or 0
-                local total = args[2] or 1
-                local percent = math.floor((used / total) * 100)
-                return string.format(" M%d%% ", percent)
-            else
-                return " MERR "
-            end
-        end, 5)  -- Update every 5 seconds
-else
-    memwidget:set_text(" M ")
-end
-
--- Create GPU widget
-local gpuwidget = wibox.widget.textbox()
-if has_vicious then
-    -- Function to get GPU info using nvidia-smi or fallback
-    local function get_gpu_info()
-        local ok, result = pcall(function()
-            local handle = io.popen("nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total --format=csv,noheader,nounits 2>/dev/null || echo '0,0,0'")
-            local output = handle:read("*a")
-            handle:close()
-            return output
-        end)
-        
-        if not ok then
-            return " GERR "
-        end
-        
-        local gpu_util, mem_used, mem_total = 0, 0, 0
-        if result then
-            gpu_util, mem_used, mem_total = result:match("(%d+), (%d+), (%d+)")
-            gpu_util = tonumber(gpu_util) or 0
-            mem_used = tonumber(mem_used) or 0
-            mem_total = tonumber(mem_total) or 0
-        end
-        
-        if gpu_util > 0 and mem_total > 0 then
-            return string.format(" G%d%% ", gpu_util)
-        else
-            -- Fallback for systems without NVIDIA or simple GPU info
-            local ok2, result2 = pcall(function()
-                local handle2 = io.popen("cat /sys/class/drm/*/gpu_busy_percent 2>/dev/null | head -1 || echo '0'")
-                local output2 = handle2:read("*a")
-                handle2:close()
-                return output2
-            end)
-            
-            if ok2 then
-                local util = tonumber(result2:gsub("%s+", "")) or 0
-                return string.format(" G%d%% ", util)
-            else
-                return " G "
-            end
-        end
+-- Wrap in pcall to catch errors
+local status, err = pcall(function()
+    -- Check if vicious loaded properly
+    if not vicious then
+        error("vicious not loaded")
     end
-    
-    vicious.register(gpuwidget, 
-        function() 
-            local ok, output = pcall(get_gpu_info)
-            if ok then
-                return output
-            else
-                return " GERR "
-            end
-        end, 
-        3)  -- Update every 3 seconds
-else
-    gpuwidget:set_text(" G ")
-end
 
--- Create Battery widget
-local batwidget = wibox.widget.textbox()
-if has_vicious then
-    vicious.register(batwidget, vicious.widgets.bat,
+    -- CPU Widget with Steam Deck colors
+    local cpu_widget = wibox.widget.textbox()
+    vicious.register(cpu_widget, vicious.widgets.cpu,
         function(widget, args)
-            local state = args[1] or "N/A"
-            local percent = args[2] or 0
-            local time = args[3] or ""
-            
-            if state == "N/A" or state == "-" then
-                return " BAC "
-            else
-                local icon = ""
-                if state == "↯" then icon = "🔌"
-                elseif state == "+" then icon = "🔋"
-                elseif state == "-" then icon = "🔻"
-                else icon = "⚡"
+            local usage = args[1]
+            local color = "#00ff00"  -- Bright green
+            if usage > 50 then color = "#ffff00" end  -- Yellow
+            if usage > 75 then color = "#ff6600" end  -- Orange
+            if usage > 90 then color = "#ff0000" end  -- Red
+            return string.format(' <span foreground="%s" font_weight="bold">CPU</span> <span foreground="%s">%2d%%</span> ', "#00ccff", color, usage)
+        end, 2)
+
+    -- RAM Widget in GB with Steam Deck colors
+    local ram_widget = wibox.widget.textbox()
+    vicious.register(ram_widget, vicious.widgets.mem,
+        function(widget, args)
+            local used_mb = args[2]
+            local total_mb = args[3]
+            local used_gb = math.floor(used_mb / 1024)
+            local total_gb = math.floor(total_mb / 1024)
+            local percent = (used_mb / total_mb) * 100
+            local color = "#ff00ff"  -- Magenta
+            if percent > 60 then color = "#ffff00" end
+            if percent > 80 then color = "#ff6600" end
+            if percent > 90 then color = "#ff0000" end
+            return string.format(' <span foreground="%s" font_weight="bold">RAM</span> <span foreground="%s">%d/%dGB</span> ', "#ff9900", color, used_gb, total_gb)
+        end, 3)
+
+    -- Brightness Widget
+    local brightness_widget = wibox.widget.textbox()
+    vicious.register(brightness_widget, vicious.widgets.os,
+        function(widget, args)
+            local f = io.open("/sys/class/backlight/intel_backlight/brightness", "r")
+            if not f then return " N/A " end
+            local current = tonumber(f:read("*a"))
+            f:close()
+            local fmax = io.open("/sys/class/backlight/intel_backlight/max_brightness", "r")
+            if not fmax then return " N/A " end
+            local max = tonumber(fmax:read("*a"))
+            fmax:close()
+            local percent = math.floor((current / max) * 100)
+            local color = "#ffcc00"
+            if percent < 30 then color = "#ff6600" end
+            if percent < 10 then color = "#ff0000" end
+            return string.format(' <span foreground="#00ccff" font_weight="bold">BRI</span> <span foreground="%s">%2d%%</span> ', color, percent)
+        end, 5)
+
+    -- Network Widget (Upload/Download speeds)
+    local net_widget = wibox.widget.textbox()
+    vicious.register(net_widget, vicious.widgets.net,
+        function(widget, args)
+            local function format_speed(bytes)
+                if bytes >= 1048576 then
+                    return string.format("%.1fMB", bytes / 1048576)
+                elseif bytes >= 1024 then
+                    return string.format("%.0fKB", bytes / 1024)
+                else
+                    return string.format("%dB", bytes)
                 end
-                
-                return string.format(" B%s%d%% ", icon, percent)
             end
-        end, 10)  -- Update every 10 seconds
-else
-    batwidget:set_text(" B ")
+            local down = args["{" .. "wlan0" .. " down_kb}"] * 1024
+            local up = args["{" .. "wlan0" .. " up_kb}"] * 1024
+            local down_color = "#00ff00"
+            local up_color = "#00ccff"
+            if down > 104857 then down_color = "#ffff00" end  -- > 100KB/s
+            if down > 1048576 then down_color = "#ff6600" end  -- > 1MB/s
+            return string.format(' <span foreground="#00ff88" font_weight="bold">NET</span> <span foreground="%s">↓%s</span> <span foreground="%s">↑%s</span> ',
+                down_color, format_speed(down), up_color, format_speed(up))
+        end, 2, "wlan0")
+
+    -- Container with dark background like Steam Deck
+    perf_widget_container = wibox.widget {
+        {
+            {
+                {
+                    cpu_widget,
+                    ram_widget,
+                    brightness_widget,
+                    net_widget,
+                    layout = wibox.layout.fixed.horizontal
+                },
+                left = 8,
+                right = 8,
+                top = 4,
+                bottom = 4,
+                widget = wibox.container.margin
+            },
+            bg = "#1a1a1a",
+            shape = function(cr, w, h)
+                gears.shape.rounded_rect(cr, w, h, 6)
+            end,
+            widget = wibox.container.background
+        },
+        layout = wibox.layout.fixed.horizontal
+    }
+end)
+
+if not status then
+    naughty.notify({
+        preset = naughty.config.presets.critical,
+        title = "Widget Error",
+        text = "Failed to load performance widgets: " .. tostring(err)
+    })
+    -- Fallback: simple text widget
+    perf_widget_container = wibox.widget.textbox("Widgets Error")
 end
+-- }}}
 
--- Create Network widget
-local netwidget = wibox.widget.textbox()
-if has_vicious then
-    -- Function to check if interface exists
-    local function interface_exists(iface)
-        local handle = io.popen("ip link show " .. iface .. " 2>/dev/null")
-        local result = handle:read("*a")
-        handle:close()
-        return result ~= ""
-    end
-    
-    -- Function to get network interface
-    local function find_active_interface()
-        if interface_exists("wlan0") then
-            return "wlan0"
-        end
-        return "lo" -- Fallback to loopback if wlan0 is not found
-    end
 
-    local interface = find_active_interface()
-    -- Store the last readings for calculating the rate
-    local last_rx = 0
-    local last_tx = 0
-    
-    vicious.register(netwidget, vicious.widgets.net,
-        function(widget, args)
-            local rx = args["{" .. interface .. " rx_b}"] or 0  -- received bytes
-            local tx = args["{" .. interface .. " tx_b}"] or 0  -- transmitted bytes
-            
-            -- Calculate speed in KB/s
-            local rx_rate = (rx - last_rx) / 1024
-            local tx_rate = (tx - last_tx) / 1024
-            
-            -- Update last values
-            last_rx = rx
-            last_tx = tx
-            
-            -- Format with one decimal place
-            return string.format(" N%.0f↓%.0f↑", rx_rate, tx_rate)
-        end, 1)  -- Update every 1 second
-else
-    netwidget:set_text(" N ")
-end
-
--- Create separator widget (compact spacing)
-local separator = wibox.widget.textbox()
-separator:set_text(" ")
-
+-- {{{ Wibar
 -- Create a textclock widget
 mytextclock = wibox.widget.textclock()
 
 -- Create a wibox for each screen and add it
 local taglist_buttons = gears.table.join(
-    awful.button({ }, 1, function(t) t:view_only() end),
-    awful.button({ modkey }, 1, function(t)
-        if client.focus then
-            client.focus:move_to_tag(t)
-        end
-    end),
-    awful.button({ }, 3, awful.tag.viewtoggle),
-    awful.button({ modkey }, 3, function(t)
-        if client.focus then
-            client.focus:toggle_tag(t)
-        end
-    end),
-    awful.button({ }, 4, function(t) awful.tag.viewnext(t.screen) end),
-    awful.button({ }, 5, function(t) awful.tag.viewprev(t.screen) end)
-)
+                    awful.button({ }, 1, function(t) t:view_only() end),
+                    awful.button({ modkey }, 1, function(t)
+                                              if client.focus then
+                                                  client.focus:move_to_tag(t)
+                                              end
+                                          end),
+                    awful.button({ }, 3, awful.tag.viewtoggle),
+                    awful.button({ modkey }, 3, function(t)
+                                              if client.focus then
+                                                  client.focus:toggle_tag(t)
+                                              end
+                                          end),
+                    awful.button({ }, 4, function(t) awful.tag.viewnext(t.screen) end),
+                    awful.button({ }, 5, function(t) awful.tag.viewprev(t.screen) end)
+                )
 
 local tasklist_buttons = gears.table.join(
-    awful.button({ }, 1, function (c)
-        if c == client.focus then
-            c.minimized = true
-        else
-            c:emit_signal(
-                "request::activate",
-                "tasklist",
-                {raise = true}
-            )
+                     awful.button({ }, 1, function (c)
+                                              if c == client.focus then
+                                                  c.minimized = true
+                                              else
+                                                  c:emit_signal(
+                                                      "request::activate",
+                                                      "tasklist",
+                                                      {raise = true}
+                                                  )
+                                              end
+                                          end),
+                     awful.button({ }, 3, function()
+                                              awful.menu.client_list({ theme = { width = 250 } })
+                                          end),
+                     awful.button({ }, 4, function ()
+                                              awful.client.focus.byidx(1)
+                                          end),
+                     awful.button({ }, 5, function ()
+                                              awful.client.focus.byidx(-1)
+                                          end))
+
+local function set_wallpaper(s)
+    -- Wallpaper
+    if beautiful.wallpaper then
+        local wallpaper = beautiful.wallpaper
+        -- If wallpaper is a function, call it with the screen
+        if type(wallpaper) == "function" then
+            wallpaper = wallpaper(s)
         end
-    end),
-    awful.button({ }, 3, function()
-        awful.menu.client_list({ theme = { width = 250 } })
-    end),
-    awful.button({ }, 4, function ()
-        awful.client.focus.byidx(1)
-    end),
-    awful.button({ }, 5, function ()
-        awful.client.focus.byidx(-1)
-    end))
+        gears.wallpaper.maximized(wallpaper, s, true)
+    end
+end
+
+-- Re-set wallpaper when a screen's geometry changes (e.g. different resolution)
+screen.connect_signal("property::geometry", set_wallpaper)
 
 awful.screen.connect_for_each_screen(function(s)
-    -- Set wallpaper
+    -- Wallpaper
     set_wallpaper(s)
-    
+
     -- Each screen has its own tag table.
     awful.tag({ "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15" }, s, awful.layout.layouts[1])
 
@@ -390,11 +323,10 @@ awful.screen.connect_for_each_screen(function(s)
     -- We need one layoutbox per screen.
     s.mylayoutbox = awful.widget.layoutbox(s)
     s.mylayoutbox:buttons(gears.table.join(
-        awful.button({ }, 1, function () awful.layout.inc( 1) end),
-        awful.button({ }, 3, function () awful.layout.inc(-1) end),
-        awful.button({ }, 4, function () awful.layout.inc( 1) end),
-        awful.button({ }, 5, function () awful.layout.inc(-1) end)))
-    
+                           awful.button({ }, 1, function () awful.layout.inc( 1) end),
+                           awful.button({ }, 3, function () awful.layout.inc(-1) end),
+                           awful.button({ }, 4, function () awful.layout.inc( 1) end),
+                           awful.button({ }, 5, function () awful.layout.inc(-1) end)))
     -- Create a taglist widget
     s.mytaglist = awful.widget.taglist {
         screen  = s,
@@ -409,8 +341,17 @@ awful.screen.connect_for_each_screen(function(s)
         buttons = tasklist_buttons
     }
 
-    -- Create the wibox
-    s.mywibox = awful.wibar({ position = "top", screen = s })
+    -- Create the wibox with transparent background
+    s.mywibox = awful.wibar({
+        position = "top",
+        screen = s,
+        height = 28,
+        bg = "#0d0d1a" .. "cc",  -- 80% opacity
+        shape = function(cr, w, h)
+            gears.shape.rounded_rect(cr, w, h, 8)
+        end,
+        margins = { top = 4, bottom = 0, left = 8, right = 8 }
+    })
 
     -- Add widgets to the wibox
     s.mywibox:setup {
@@ -424,16 +365,7 @@ awful.screen.connect_for_each_screen(function(s)
         s.mytasklist, -- Middle widget
         { -- Right widgets
             layout = wibox.layout.fixed.horizontal,
-            cpuwidget,
-            separator,
-            memwidget,
-            separator,
-            gpuwidget,
-            separator,
-            batwidget,
-            separator,
-            netwidget,
-            separator,
+            perf_widget_container,
             wibox.widget.systray(),
             mytextclock,
             s.mylayoutbox,
@@ -598,11 +530,11 @@ clientkeys = gears.table.join(
 
 -- Bind all key numbers to tags.
 -- Be careful: we use keycodes to make it work on any keyboard layout.
--- This should map on the top row of your keyboard, usually 1 to 9, and for 10-15 it will use function keys F1-F6.
+-- This should map on the top row of your keyboard, usually 1 to 9.
 for i = 1, 15 do
     globalkeys = gears.table.join(globalkeys,
         -- View tag only.
-        awful.key({ modkey }, i <= 9 and "#" .. i + 9 or "F" .. (i - 9),
+        awful.key({ modkey }, "#" .. i + 9,
                   function ()
                         local screen = awful.screen.focused()
                         local tag = screen.tags[i]
@@ -612,7 +544,7 @@ for i = 1, 15 do
                   end,
                   {description = "view tag #"..i, group = "tag"}),
         -- Toggle tag display.
-        awful.key({ modkey, "Control" }, i <= 9 and "#" .. i + 9 or "F" .. (i - 9),
+        awful.key({ modkey, "Control" }, "#" .. i + 9,
                   function ()
                       local screen = awful.screen.focused()
                       local tag = screen.tags[i]
@@ -622,7 +554,7 @@ for i = 1, 15 do
                   end,
                   {description = "toggle tag #" .. i, group = "tag"}),
         -- Move client to tag.
-        awful.key({ modkey, "Shift" }, i <= 9 and "#" .. i + 9 or "F" .. (i - 9),
+        awful.key({ modkey, "Shift" }, "#" .. i + 9,
                   function ()
                       if client.focus then
                           local tag = client.focus.screen.tags[i]
@@ -633,7 +565,7 @@ for i = 1, 15 do
                   end,
                   {description = "move focused client to tag #"..i, group = "tag"}),
         -- Toggle tag on focused client.
-        awful.key({ modkey, "Control", "Shift" }, i <= 9 and "#" .. i + 9 or "F" .. (i - 9),
+        awful.key({ modkey, "Control", "Shift" }, "#" .. i + 9,
                   function ()
                       if client.focus then
                           local tag = client.focus.screen.tags[i]
@@ -711,9 +643,14 @@ awful.rules.rules = {
         }
       }, properties = { floating = true }},
 
-    -- Add titlebars to normal clients and dialogs
+    -- Disable titlebars for clean, seamless look
     { rule_any = {type = { "normal", "dialog" }
       }, properties = { titlebars_enabled = false }
+    },
+
+    -- Explicitly disable titlebar for Alacritty
+    { rule = { class = "Alacritty" },
+      properties = { titlebars_enabled = false }
     },
 
     -- Set Firefox to always map on the tag named "2" on screen 1.
@@ -737,16 +674,55 @@ client.connect_signal("manage", function (c)
     end
 end)
 
--- Titlebars disabled - no titlebar setup needed
+-- Add a titlebar if titlebars_enabled is set to true in the rules.
+client.connect_signal("request::titlebars", function(c)
+    -- buttons for the titlebar
+    local buttons = gears.table.join(
+        awful.button({ }, 1, function()
+            c:emit_signal("request::activate", "titlebar", {raise = true})
+            awful.mouse.client.move(c)
+        end),
+        awful.button({ }, 3, function()
+            c:emit_signal("request::activate", "titlebar", {raise = true})
+            awful.mouse.client.resize(c)
+        end)
+    )
+
+    awful.titlebar(c) : setup {
+        { -- Left
+            awful.titlebar.widget.iconwidget(c),
+            buttons = buttons,
+            layout  = wibox.layout.fixed.horizontal
+        },
+        { -- Middle
+            { -- Title
+                align  = "center",
+                widget = awful.titlebar.widget.titlewidget(c)
+            },
+            buttons = buttons,
+            layout  = wibox.layout.flex.horizontal
+        },
+        { -- Right
+            awful.titlebar.widget.floatingbutton (c),
+            awful.titlebar.widget.maximizedbutton(c),
+            awful.titlebar.widget.stickybutton   (c),
+            awful.titlebar.widget.ontopbutton    (c),
+            awful.titlebar.widget.closebutton    (c),
+            layout = wibox.layout.fixed.horizontal()
+        },
+        layout = wibox.layout.align.horizontal
+    }
+end)
 
 -- Enable sloppy focus, so that focus follows mouse.
 client.connect_signal("mouse::enter", function(c)
     c:emit_signal("request::activate", "mouse_enter", {raise = false})
 end)
 
-client.connect_signal("focus", function(c) c.border_color = beautiful.border_focus end)
-client.connect_signal("unfocus", function(c) c.border_color = beautiful.border_normal end)
+-- Border signals disabled (border_width = 0)
+-- }}}
 
--- Reset wallpaper when screen geometry changes
-screen.connect_signal("property::geometry", set_wallpaper)
+-- {{{ Autostart
+-- Compositor for shadows and blur
+awful.spawn.with_shell("picom -b 2>/dev/null || true")
 -- }}}
